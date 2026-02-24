@@ -1,0 +1,41 @@
+{
+  "nuri-levy": {
+    "x": 3.35,
+    "z": 2.51,
+    "y": 0,
+    "scale": 2.58
+  },
+  "nathan-fielder": {
+    "x": -2.85,
+    "z": 2.13,
+    "y": 0,
+    "scale": 2.91
+  },
+  "fathan-nielder": {
+    "x": -1.4,
+    "z": 0.48,
+    "y": 0,
+    "scale": 2.91
+  },
+  "luri-nevy": {
+    "x": 1.68,
+    "z": 0.19,
+    "y": 0,
+    "scale": 2.91
+  },
+  "__hoverConfig": {
+    "glowSize": 1,
+    "glowOpacity": 0.65,
+    "scaleGrowth": 1.03,
+    "dimOpacity": 0.2,
+    "pulseSpeed": 2.8,
+    "pulseAmount": 0.8,
+    "pixelGrid": 62,
+    "pixelSpread": 0,
+    "pixelSpeed": 1.2,
+    "pixelSizeVar": 1,
+    "pixelDensity": 0.65,
+    "pixelFade": 1,
+    "pixelBright": 1.1
+  }
+}

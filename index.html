@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Romites — Artist Collective</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com"  />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ============================================================
+       HERO 1 — Three.js 3D Room
+       ============================================================ -->
+  <section id="hero" class="hero-section">
+    <div id="room-canvas-container"></div>
+    <div class="hero-overlay"></div>
+  </section>
+
+  <!-- ============================================================
+       NAVIGATION (sticky, below the fold)
+       ============================================================ -->
+  <nav id="main-nav">
+    <a href="/" class="nav-logo">Romites</a>
+    <div class="nav-links">
+      <a href="#axoloodle">Axoloodle</a>
+      <a href="#artists">Artists</a>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO 2 — Axoloodle Zine
+       ============================================================ -->
+  <section id="axoloodle" class="axoloodle-section">
+    <div class="axoloodle-inner">
+      <div class="axoloodle-badge">FREE INTERNET ZINE</div>
+      <h2 class="axoloodle-title">Axoloodle</h2>
+      <p class="axoloodle-desc">
+        Our flagship project — a free internet zine showcasing art, stories
+        and experiments from the Romites collective and friends.
+      </p>
+      <a href="#" class="btn btn-axoloodle">Read the latest issue &rarr;</a>
+    </div>
+    <div class="axoloodle-visual">
+      <!-- decorative animated SVG blobs -->
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="blob blob-1">
+        <path fill="#7B61FF" d="M45.3,-58.1C56.9,-50.5,63.1,-34.3,66.8,-17.6C70.5,-0.8,71.7,16.6,64.5,29.2C57.3,41.8,41.7,49.7,26.1,55.4C10.5,61.1,-5.1,64.6,-20.6,62C-36.1,59.4,-51.5,50.7,-60.1,37.4C-68.7,24.1,-70.6,6.2,-66.5,-9.2C-62.4,-24.6,-52.3,-37.5,-40.1,-45.1C-27.8,-52.7,-13.9,-55,2.2,-57.8C18.3,-60.6,33.7,-65.8,45.3,-58.1Z" transform="translate(100 100)" />
+      </svg>
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="blob blob-2">
+        <path fill="#FF6B9D" d="M42.8,-51.2C55.9,-42.7,66.8,-29.5,69.7,-14.7C72.5,0.1,67.3,16.5,58.5,29.6C49.7,42.7,37.3,52.5,22.7,58.5C8.1,64.5,-8.6,66.6,-23.5,62.1C-38.3,57.5,-51.2,46.3,-59.4,32.2C-67.5,18,-70.9,0.8,-67.1,-14.2C-63.3,-29.2,-52.4,-42,-39.6,-50.6C-26.8,-59.1,-13.4,-63.3,1.1,-64.7C15.7,-66,29.7,-59.7,42.8,-51.2Z" transform="translate(100 100)" />
+      </svg>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ARTISTS GRID
+       ============================================================ -->
+  <section id="artists" class="artists-section">
+    <h2 class="section-title">The Collective</h2>
+    <div id="artists-grid" class="artists-grid">
+      <!-- populated by JS -->
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer id="site-footer">
+    <div class="footer-inner">
+      <span class="footer-brand">Romites &copy; 2025</span>
+      <div id="footer-links" class="footer-links"></div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       ARTIST DETAIL MODAL / PAGE (hidden by default)
+       ============================================================ -->
+  <div id="artist-page" class="artist-page" hidden>
+    <button class="artist-page-close" id="artist-close">&times;</button>
+    <div class="artist-page-inner" id="artist-page-inner">
+      <!-- populated by JS -->
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
