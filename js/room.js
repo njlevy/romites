@@ -18,14 +18,38 @@ export function initRoom(container) {
 
   /* ---- scene ---- */
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xf5f5f5, 8, 28);
+  scene.fog = new THREE.Fog(0xf5f5f5, 14, 30);
 
-  /* ---- responsive camera config ---- */
+  /* ---- responsive camera config (smooth interpolation) ---- */
   function getResponsiveConfig() {
     const w = window.innerWidth;
-    if (w <= 480)  return { fov: 65, baseZ: 10, rangeX: 1.5, rangeY: 0.6 };
-    if (w <= 768)  return { fov: 58, baseZ: 9,  rangeX: 2,   rangeY: 0.8 };
-    return                 { fov: 50, baseZ: 8,  rangeX: 3,   rangeY: 1.2 };
+    // Lerp helper: clamp t to 0–1 then interpolate a→b
+    const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+
+    // Mobile (<=400) → Tablet (768) → Desktop (>=1200)
+    const mobileW = 400, tabletW = 768, desktopW = 1200;
+
+    // Config at each anchor point
+    const mobile  = { fov: 75, baseZ: 12, rangeX: 0.8, rangeY: 0.4 };
+    const tablet  = { fov: 62, baseZ: 10, rangeX: 1.5, rangeY: 0.6 };
+    const desktop = { fov: 50, baseZ: 8,  rangeX: 3,   rangeY: 1.2 };
+
+    if (w <= mobileW) return mobile;
+    if (w >= desktopW) return desktop;
+
+    // Interpolate between anchors
+    const from = w < tabletW ? mobile : tablet;
+    const to   = w < tabletW ? tablet : desktop;
+    const minW = w < tabletW ? mobileW : tabletW;
+    const maxW = w < tabletW ? tabletW : desktopW;
+    const t = (w - minW) / (maxW - minW);
+
+    return {
+      fov:    lerp(from.fov, to.fov, t),
+      baseZ:  lerp(from.baseZ, to.baseZ, t),
+      rangeX: lerp(from.rangeX, to.rangeX, t),
+      rangeY: lerp(from.rangeY, to.rangeY, t),
+    };
   }
 
   let config = getResponsiveConfig();
@@ -61,10 +85,10 @@ export function initRoom(container) {
   }
 
   const gridTex = makeGridTexture();
-  gridTex.repeat.set(4, 4);
+  gridTex.repeat.set(10, 10);
 
   const wallTex = makeGridTexture(512, 16, '#e0e0e0', '#fdfdfd');
-  wallTex.repeat.set(3, 2);
+  wallTex.repeat.set(7, 4);
 
   const matFloor = new THREE.MeshStandardMaterial({
     map: gridTex,
@@ -80,7 +104,7 @@ export function initRoom(container) {
   });
 
   /* ---- room geometry ---- */
-  const roomW = 16, roomD = 16, roomH = 8;
+  const roomW = 40, roomD = 40, roomH = 24;
 
   // Floor
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), matFloor);
@@ -164,13 +188,18 @@ export function initRoom(container) {
   }
   animate();
 
-  /* ---- resize ---- */
+  /* ---- resize (debounced) ---- */
+  let resizeTimer = null;
   function onResize() {
-    config = getResponsiveConfig();
-    camera.fov = config.fov;
-    camera.aspect = container.clientWidth / container.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      config = getResponsiveConfig();
+      camera.fov = config.fov;
+      camera.position.z = config.baseZ;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }, 150);
   }
   window.addEventListener('resize', onResize);
 

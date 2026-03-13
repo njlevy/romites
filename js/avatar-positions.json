@@ -1,9 +1,9 @@
 {
-  "nuri-levy": {
-    "x": 3.35,
-    "z": 2.51,
+  "karen-williams": {
+    "x": 0.32,
+    "z": 2,
     "y": 0,
-    "scale": 2.58
+    "scale": 2.91
   },
   "nathan-fielder": {
     "x": -2.85,
@@ -12,30 +12,30 @@
     "scale": 2.91
   },
   "fathan-nielder": {
-    "x": -1.4,
-    "z": 0.48,
+    "x": -1.63,
+    "z": 0.2,
     "y": 0,
     "scale": 2.91
   },
   "luri-nevy": {
-    "x": 1.68,
-    "z": 0.19,
+    "x": 2.13,
+    "z": -1.27,
     "y": 0,
     "scale": 2.91
   },
   "__hoverConfig": {
-    "glowSize": 1,
-    "glowOpacity": 0.65,
+    "glowSize": 1.1,
+    "glowOpacity": 0.5,
     "scaleGrowth": 1.03,
     "dimOpacity": 0.2,
-    "pulseSpeed": 2.8,
+    "pulseSpeed": 1.1,
     "pulseAmount": 0.8,
-    "pixelGrid": 62,
-    "pixelSpread": 0,
-    "pixelSpeed": 1.2,
+    "pixelGrid": 92,
+    "pixelSpread": 0.34,
+    "pixelSpeed": 1.3,
     "pixelSizeVar": 1,
-    "pixelDensity": 0.65,
-    "pixelFade": 1,
-    "pixelBright": 1.1
+    "pixelDensity": 0.3,
+    "pixelFade": 2,
+    "pixelBright": 20.3
   }
 }

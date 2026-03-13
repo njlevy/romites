@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(location.hash.startsWith('#artist/'))document.documentElement.classList.add('direct-artist')</script>
+  <style>.direct-artist{background:#0e0e0e}.direct-artist body{visibility:hidden}.direct-artist #direct-load-overlay{visibility:visible}</style>
   <title>Romites — Artist Collective</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -11,11 +13,21 @@
 </head>
 <body>
 
+  <!-- Direct artist URL overlay -->
+  <div id="direct-load-overlay" style="position:fixed;inset:0;z-index:9999;background:#0e0e0e;display:flex;align-items:center;justify-content:center">
+    <div class="room-loader-dots"><span></span><span></span><span></span></div>
+  </div>
+
   <!-- ============================================================
        HERO 1 — Three.js 3D Room
        ============================================================ -->
   <section id="hero" class="hero-section">
-    <div id="room-canvas-container"></div>
+    <div id="room-canvas-container">
+      <div class="room-loader" id="room-loader">
+        <div class="room-loader-dots"><span></span><span></span><span></span></div>
+        <div class="room-loader-text">loading</div>
+      </div>
+    </div>
     <div class="hero-overlay"></div>
   </section>
 
@@ -60,7 +72,11 @@
   <section id="artists" class="artists-section">
     <h2 class="section-title">The Collective</h2>
     <div id="artists-grid" class="artists-grid">
-      <!-- populated by JS -->
+      <div class="section-loader" id="artists-loader">
+        <span class="section-loader-dot"></span>
+        <span class="section-loader-dot"></span>
+        <span class="section-loader-dot"></span>
+      </div>
     </div>
   </section>
 
@@ -78,7 +94,7 @@
        ARTIST DETAIL MODAL / PAGE (hidden by default)
        ============================================================ -->
   <div id="artist-page" class="artist-page" hidden>
-    <button class="artist-page-close" id="artist-close">&times;</button>
+    <button class="artist-page-close" id="artist-close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
     <div class="artist-page-inner" id="artist-page-inner">
       <!-- populated by JS -->
     </div>

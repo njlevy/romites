@@ -30,7 +30,7 @@ const hoverConfig = {
   pixelSizeVar:   0.5,   // size variation between pixels (0 = uniform, 1 = very varied)
   pixelDensity:   0.6,   // fraction of grid cells that emit (0–1)
   pixelFade:      0.5,   // how much pixels fade as they drift (0 = no fade, 1 = full)
-  pixelBright:    2.0,   // brightness multiplier for pixel emission (1 = normal, 3 = very bright)
+  pixelBright:    4.0,   // brightness multiplier for pixel emission
 };
 
 /* ================================================================
@@ -176,14 +176,17 @@ function generateGlowMap(img) {
     outCtx.drawImage(pixCanvas, 0, 0, outW, outH);
     // Additional blur passes to spread the glow
     if (typeof outCtx.filter !== 'undefined') {
-      outCtx.filter = 'blur(4px)';
+      outCtx.filter = 'blur(2px)';
     }
-    for (let pass = 0; pass < 3; pass++) {
-      outCtx.globalAlpha = 0.7;
+    for (let pass = 0; pass < 2; pass++) {
+      outCtx.globalAlpha = 0.85;
       outCtx.drawImage(outCanvas, 0, 0);
     }
     outCtx.filter = 'none';
+    // Extra full-opacity pass to stamp alpha back up in the core silhouette area
     outCtx.globalAlpha = 1.0;
+    outCtx.imageSmoothingEnabled = false;
+    outCtx.drawImage(pixCanvas, 0, 0, outW, outH);
 
     const tex = new THREE.CanvasTexture(outCanvas);
     tex.magFilter = THREE.NearestFilter;
@@ -210,23 +213,31 @@ function generateGlowMapFallback(img) {
     outCtx.filter = 'blur(6px)';
   }
   for (let pass = 0; pass < 3; pass++) {
-    outCtx.globalAlpha = 0.7;
+    outCtx.globalAlpha = 0.85;
     outCtx.drawImage(outCanvas, 0, 0);
   }
   outCtx.filter = 'none';
+  // Extra full-opacity pass to reinforce the core silhouette
   outCtx.globalAlpha = 1.0;
+  outCtx.drawImage(img, 0, 0, outW, outH);
   const tex = new THREE.CanvasTexture(outCanvas);
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   return tex;
 }
 
-function createGlowMaterial(glowMapTex, hexColor) {
-  const c = new THREE.Color(hexColor);
+function createGlowMaterial(glowMapTex, hexColor, avatarTex, glowScale) {
+  // Parse hex directly to sRGB 0–1 to avoid THREE.Color's linear conversion darkening the color
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
   return new THREE.ShaderMaterial({
     uniforms: {
       glowMap:       { value: glowMapTex },
-      glowColor:     { value: new THREE.Vector3(c.r, c.g, c.b) },
+      avatarMap:     { value: avatarTex || null },
+      glowScale:     { value: glowScale || hoverConfig.glowSize },
+      glowColor:     { value: new THREE.Vector3(r, g, b) },
       glowIntensity: { value: 0.0 },
       time:          { value: 0.0 },
       pulseSpeed:    { value: hoverConfig.pulseSpeed },
@@ -248,6 +259,8 @@ function createGlowMaterial(glowMapTex, hexColor) {
     `,
     fragmentShader: `
       uniform sampler2D glowMap;
+      uniform sampler2D avatarMap;
+      uniform float glowScale;
       uniform vec3 glowColor;
       uniform float glowIntensity;
       uniform float time;
@@ -324,8 +337,8 @@ function createGlowMaterial(glowMapTex, hexColor) {
         vec2 sourceUv = cellCenter - driftDir * driftDist;
         float sourceSilhouette = texture2D(glowMap, sourceUv).a;
 
-        // Boost: treat any silhouette alpha > 0.05 as fully solid for pixel emission
-        float emitStrength = smoothstep(0.05, 0.15, sourceSilhouette) * cellActive;
+        // Boost: treat silhouette alpha above threshold as solid for pixel emission
+        float emitStrength = smoothstep(0.15, 0.4, sourceSilhouette) * cellActive;
 
         // Fade as pixels travel outward
         float fadeFactor = 1.0 - driftCycle * pixelFade;
@@ -336,7 +349,16 @@ function createGlowMaterial(glowMapTex, hexColor) {
 
         // Final alpha: pixel squares only, boosted by brightness
         float pixelAlpha = emitStrength * inSquare * fadeFactor * pulse * pixelBright;
-        float finalAlpha = clamp(pixelAlpha * glowIntensity, 0.0, 1.0);
+
+        // Mask out the avatar area — remap glow UVs to avatar space
+        // The glow plane is glowScale× larger, so avatar occupies the center 1/glowScale portion
+        vec2 avatarUv = (vUv - 0.5) * glowScale + 0.5;
+        float avatarMask = 1.0;
+        if (avatarUv.x >= 0.0 && avatarUv.x <= 1.0 && avatarUv.y >= 0.0 && avatarUv.y <= 1.0) {
+          avatarMask = 1.0 - texture2D(avatarMap, avatarUv).a;
+        }
+
+        float finalAlpha = clamp(pixelAlpha * glowIntensity * avatarMask, 0.0, 1.0);
 
         gl_FragColor = vec4(glowColor, finalAlpha);
       }
@@ -344,7 +366,7 @@ function createGlowMaterial(glowMapTex, hexColor) {
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   });
 }
 
@@ -416,15 +438,15 @@ function buildEditorPanel(container, avatarStates, camera, savedPositions, rende
       <div class="ge-hover-title">Hover Effects</div>
       <div class="ge-hover-grid">
         <label class="ge-hover-label">Glow Size
-          <input type="range" min="1" max="3" step="0.05" class="ge-range" id="ge-glowSize" value="${hoverConfig.glowSize}" />
+          <input type="range" min="0.1" max="6" step="0.05" class="ge-range" id="ge-glowSize" value="${hoverConfig.glowSize}" />
           <span class="ge-range-val" id="ge-glowSize-val">${hoverConfig.glowSize}</span>
         </label>
         <label class="ge-hover-label">Glow Opacity
-          <input type="range" min="0" max="1" step="0.05" class="ge-range" id="ge-glowOpacity" value="${hoverConfig.glowOpacity}" />
+          <input type="range" min="0" max="2" step="0.05" class="ge-range" id="ge-glowOpacity" value="${hoverConfig.glowOpacity}" />
           <span class="ge-range-val" id="ge-glowOpacity-val">${hoverConfig.glowOpacity}</span>
         </label>
         <label class="ge-hover-label">Scale Growth
-          <input type="range" min="1" max="1.5" step="0.01" class="ge-range" id="ge-scaleGrowth" value="${hoverConfig.scaleGrowth}" />
+          <input type="range" min="1" max="3" step="0.01" class="ge-range" id="ge-scaleGrowth" value="${hoverConfig.scaleGrowth}" />
           <span class="ge-range-val" id="ge-scaleGrowth-val">${hoverConfig.scaleGrowth}</span>
         </label>
         <label class="ge-hover-label">Dim Opacity
@@ -432,11 +454,11 @@ function buildEditorPanel(container, avatarStates, camera, savedPositions, rende
           <span class="ge-range-val" id="ge-dimOpacity-val">${hoverConfig.dimOpacity}</span>
         </label>
         <label class="ge-hover-label">Pulse Speed
-          <input type="range" min="0" max="5" step="0.1" class="ge-range" id="ge-pulseSpeed" value="${hoverConfig.pulseSpeed}" />
+          <input type="range" min="0" max="20" step="0.1" class="ge-range" id="ge-pulseSpeed" value="${hoverConfig.pulseSpeed}" />
           <span class="ge-range-val" id="ge-pulseSpeed-val">${hoverConfig.pulseSpeed}</span>
         </label>
         <label class="ge-hover-label">Pulse Amount
-          <input type="range" min="0" max="0.8" step="0.05" class="ge-range" id="ge-pulseAmount" value="${hoverConfig.pulseAmount}" />
+          <input type="range" min="0" max="2" step="0.05" class="ge-range" id="ge-pulseAmount" value="${hoverConfig.pulseAmount}" />
           <span class="ge-range-val" id="ge-pulseAmount-val">${hoverConfig.pulseAmount}</span>
         </label>
       </div>
@@ -445,31 +467,31 @@ function buildEditorPanel(container, avatarStates, camera, savedPositions, rende
       </div>
       <div class="ge-hover-grid">
         <label class="ge-hover-label">Grid Size
-          <input type="range" min="6" max="64" step="1" class="ge-range" id="ge-pixelGrid" value="${hoverConfig.pixelGrid}" />
+          <input type="range" min="2" max="128" step="1" class="ge-range" id="ge-pixelGrid" value="${hoverConfig.pixelGrid}" />
           <span class="ge-range-val" id="ge-pixelGrid-val">${hoverConfig.pixelGrid}</span>
         </label>
         <label class="ge-hover-label">Spread
-          <input type="range" min="0" max="1" step="0.02" class="ge-range" id="ge-pixelSpread" value="${hoverConfig.pixelSpread}" />
+          <input type="range" min="0" max="3" step="0.02" class="ge-range" id="ge-pixelSpread" value="${hoverConfig.pixelSpread}" />
           <span class="ge-range-val" id="ge-pixelSpread-val">${hoverConfig.pixelSpread}</span>
         </label>
         <label class="ge-hover-label">Speed
-          <input type="range" min="0" max="4" step="0.1" class="ge-range" id="ge-pixelSpeed" value="${hoverConfig.pixelSpeed}" />
+          <input type="range" min="0" max="20" step="0.1" class="ge-range" id="ge-pixelSpeed" value="${hoverConfig.pixelSpeed}" />
           <span class="ge-range-val" id="ge-pixelSpeed-val">${hoverConfig.pixelSpeed}</span>
         </label>
         <label class="ge-hover-label">Size Var
-          <input type="range" min="0" max="1" step="0.05" class="ge-range" id="ge-pixelSizeVar" value="${hoverConfig.pixelSizeVar}" />
+          <input type="range" min="0" max="2" step="0.05" class="ge-range" id="ge-pixelSizeVar" value="${hoverConfig.pixelSizeVar}" />
           <span class="ge-range-val" id="ge-pixelSizeVar-val">${hoverConfig.pixelSizeVar}</span>
         </label>
         <label class="ge-hover-label">Density
-          <input type="range" min="0" max="1" step="0.05" class="ge-range" id="ge-pixelDensity" value="${hoverConfig.pixelDensity}" />
+          <input type="range" min="0" max="1" step="0.01" class="ge-range" id="ge-pixelDensity" value="${hoverConfig.pixelDensity}" />
           <span class="ge-range-val" id="ge-pixelDensity-val">${hoverConfig.pixelDensity}</span>
         </label>
         <label class="ge-hover-label">Fade
-          <input type="range" min="0" max="1" step="0.05" class="ge-range" id="ge-pixelFade" value="${hoverConfig.pixelFade}" />
+          <input type="range" min="0" max="3" step="0.05" class="ge-range" id="ge-pixelFade" value="${hoverConfig.pixelFade}" />
           <span class="ge-range-val" id="ge-pixelFade-val">${hoverConfig.pixelFade}</span>
         </label>
         <label class="ge-hover-label">Brightness
-          <input type="range" min="0.5" max="5" step="0.1" class="ge-range" id="ge-pixelBright" value="${hoverConfig.pixelBright}" />
+          <input type="range" min="0" max="30" step="0.1" class="ge-range" id="ge-pixelBright" value="${hoverConfig.pixelBright}" />
           <span class="ge-range-val" id="ge-pixelBright-val">${hoverConfig.pixelBright}</span>
         </label>
       </div>
@@ -814,6 +836,13 @@ export async function populateGallery(scene, camera, renderer, container, artist
           avatarStates[stateIndex].textureLoaded = true;
           avatarStates[stateIndex].targetOpacity = 1;
 
+          // Hide room loader after first texture loads
+          const roomLoader = container.querySelector('.room-loader');
+          if (roomLoader && !roomLoader.classList.contains('hidden')) {
+            roomLoader.classList.add('hidden');
+            setTimeout(() => roomLoader.remove(), 600);
+          }
+
           const w = AVATAR_H * aspect;
           avatarMesh.geometry.dispose();
           avatarMesh.geometry = new THREE.PlaneGeometry(w, AVATAR_H);
@@ -828,9 +857,11 @@ export async function populateGallery(scene, camera, renderer, container, artist
             try {
               const glowMapTex = generateGlowMap(glowImg);
               if (glowMapTex) {
-                const glowMat = createGlowMaterial(glowMapTex, artist.hex || '#ffffff');
+                const glowMat = createGlowMaterial(glowMapTex, artist.hex || '#ffffff', avatarMat.map, hoverConfig.glowSize);
                 const glowGeo = new THREE.PlaneGeometry(w * hoverConfig.glowSize, AVATAR_H * hoverConfig.glowSize);
                 const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+                glowMesh.renderOrder = 0;
+                avatarMesh.renderOrder = 1;
                 glowMesh.position.copy(avatarMesh.position);
                 glowMesh.position.z -= 0.01;
                 glowMesh.scale.copy(avatarMesh.scale);
@@ -938,15 +969,16 @@ export async function populateGallery(scene, camera, renderer, container, artist
         // Anchor scale from bottom
         state.mesh.position.y = (AVATAR_H / 2) * state.currentScale + (state.yOffset || 0);
 
-        // Glow plane
+        // Glow plane — cap intensity by avatar opacity so glow never shows through a dimmed avatar
         if (state.glowMesh && state.glowMat) {
-          state.glowMat.uniforms.glowIntensity.value = state.currentGlowIntensity;
+          const effectiveGlow = Math.min(state.currentGlowIntensity, state.currentOpacity);
+          state.glowMat.uniforms.glowIntensity.value = effectiveGlow;
           state.glowMat.uniforms.time.value = elapsed;
           state.glowMesh.position.x = state.mesh.position.x;
           state.glowMesh.position.y = state.mesh.position.y;
           state.glowMesh.position.z = state.mesh.position.z - 0.01;
           state.glowMesh.scale.setScalar(state.currentScale);
-          state.glowMesh.visible = state.currentGlowIntensity > 0.01;
+          state.glowMesh.visible = effectiveGlow > 0.01;
         }
       }
     });
@@ -966,8 +998,27 @@ export async function populateGallery(scene, camera, renderer, container, artist
   });
 
   /* ---- hover helpers ---- */
+  let hoverLockTimer = null;
+
   function setHover(mesh, locked) {
+    // Skip tooltip/hover if texture hasn't loaded yet
+    const meshState = avatarStates.find(s => s.mesh === mesh);
+    if (meshState && !meshState.textureLoaded) return;
+
     const changed = hoveredMesh !== mesh;
+
+    // Auto-lock timer: if hovering a new artist (not already locked), start a 2.5s timer
+    if (changed) {
+      if (hoverLockTimer) { clearTimeout(hoverLockTimer); hoverLockTimer = null; }
+      if (!locked) {
+        hoverLockTimer = setTimeout(() => {
+          if (hoveredMesh === mesh && !lockedMesh) {
+            lockedMesh = mesh;
+            setHover(mesh, true);
+          }
+        }, 2500);
+      }
+    }
     hoveredMesh = mesh;
     domEl.style.cursor = 'pointer';
 
@@ -1006,7 +1057,21 @@ export async function populateGallery(scene, camera, renderer, container, artist
     }
   }
 
+  function unlockHover() {
+    // Downgrade from locked to normal hover — remove button, keep tooltip visible
+    lockedMesh = null;
+    if (tooltip && hoveredMesh) {
+      const artist = hoveredMesh.userData.artist;
+      tooltip.innerHTML = `
+        <div class="room-tooltip-name" style="color:${artist.hex}">${artist.name}</div>
+        <div class="room-tooltip-desc">${artist.description}</div>
+      `;
+      tooltip.classList.remove('locked');
+    }
+  }
+
   function clearHover() {
+    if (hoverLockTimer) { clearTimeout(hoverLockTimer); hoverLockTimer = null; }
     hoveredMesh = null;
     lockedMesh = null;
     domEl.style.cursor = '';
@@ -1029,17 +1094,17 @@ export async function populateGallery(scene, camera, renderer, container, artist
     if (hits.length > 0) {
       const hit = hits[0].object;
       if (lockedMesh === hit) {
-        // Clicking the same locked artist unlocks
-        clearHover();
+        // Clicking the same locked artist — just unlock, keep hover
+        unlockHover();
       } else {
         // Lock onto this artist
         lockedMesh = hit;
         setHover(hit, true);
       }
     } else {
-      // Clicking empty space clears lock
+      // Clicking empty space — just unlock, keep hover
       if (lockedMesh) {
-        clearHover();
+        unlockHover();
       }
     }
   });
@@ -1056,8 +1121,8 @@ export async function populateGallery(scene, camera, renderer, container, artist
     if (hits.length > 0) {
       const hit = hits[0].object;
       if (lockedMesh === hit) {
-        // Tapping the locked artist unlocks
-        clearHover();
+        // Tapping the locked artist — just unlock, keep hover
+        unlockHover();
       } else {
         // Lock onto this artist
         lockedMesh = hit;
@@ -1066,7 +1131,7 @@ export async function populateGallery(scene, camera, renderer, container, artist
       }
     } else {
       if (lockedMesh) {
-        clearHover();
+        unlockHover();
       }
     }
   }, { passive: false });
@@ -1108,15 +1173,16 @@ export async function populateGallery(scene, camera, renderer, container, artist
         // Anchor scale from bottom: keep bottom edge at yOffset
         state.mesh.position.y = (AVATAR_H / 2) * state.currentScale + (state.yOffset || 0);
 
-        // Glow plane
+        // Glow plane — cap intensity by avatar opacity so glow never shows through a dimmed avatar
         if (state.glowMesh && state.glowMat) {
-          state.glowMat.uniforms.glowIntensity.value = state.currentGlowIntensity;
+          const effectiveGlow = Math.min(state.currentGlowIntensity, state.currentOpacity);
+          state.glowMat.uniforms.glowIntensity.value = effectiveGlow;
           state.glowMat.uniforms.time.value = elapsed;
           state.glowMesh.position.x = state.mesh.position.x;
           state.glowMesh.position.y = state.mesh.position.y;
           state.glowMesh.position.z = state.mesh.position.z - 0.01;
           state.glowMesh.scale.setScalar(state.currentScale);
-          state.glowMesh.visible = state.currentGlowIntensity > 0.01;
+          state.glowMesh.visible = effectiveGlow > 0.01;
         }
       }
 
