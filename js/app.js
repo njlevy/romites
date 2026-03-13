@@ -11,7 +11,13 @@ import { populateGallery } from './gallery3d.js';
 /* ================================================================
    INIT
    ================================================================ */
+// Prevent browser scroll restoration
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
 document.addEventListener('DOMContentLoaded', async () => {
+  // Start at top unless deep-linking to an artist
+  if (!location.hash.startsWith('#artist/')) window.scrollTo(0, 0);
+
   // 1. Kick off Three.js room immediately (doesn't need data)
   const roomContainer = document.getElementById('room-canvas-container');
   let room = null;
@@ -40,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 4. Populate 3D room with artist avatars
   if (room && artists.length > 0) {
-    populateGallery(room.scene, room.camera, room.renderer, roomContainer, artists, room.onBeforeRender);
+    populateGallery(room.scene, room.camera, room.renderer, roomContainer, artists, room.onBeforeRender, room.focusTarget);
   } else {
     // No artists — hide room loader immediately
     const roomLoader = document.getElementById('room-loader');

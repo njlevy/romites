@@ -755,7 +755,7 @@ function buildEditorPanel(container, avatarStates, camera, savedPositions, rende
 /* ================================================================
    MAIN EXPORT
    ================================================================ */
-export async function populateGallery(scene, camera, renderer, container, artists, onBeforeRender) {
+export async function populateGallery(scene, camera, renderer, container, artists, onBeforeRender, focusTarget) {
   if (!artists.length) return;
 
   const editorMode = isEditorMode();
@@ -882,6 +882,18 @@ export async function populateGallery(scene, camera, renderer, container, artist
         });
       }, idx * 150); // 150ms stagger per avatar
     }
+  }
+
+  // Compute group centroid and set as camera base offset
+  if (avatarMeshes.length > 0) {
+    let sumX = 0, sumZ = 0;
+    for (const m of avatarMeshes) { sumX += m.position.x; sumZ += m.position.z; }
+    const centroidX = sumX / avatarMeshes.length;
+    const centroidZ = sumZ / avatarMeshes.length;
+    if (focusTarget) { focusTarget.baseX = centroidX; focusTarget.baseZ = centroidZ; }
+    // Center logo above the group
+    logoMesh.position.x = centroidX;
+    logoMesh.position.z = centroidZ;
   }
 
   /* ---- EDITOR MODE ---- */
@@ -1022,13 +1034,20 @@ export async function populateGallery(scene, camera, renderer, container, artist
     hoveredMesh = mesh;
     domEl.style.cursor = 'pointer';
 
+    // Shift camera toward the avatar only on lock (click or delayed hover)
+    if (focusTarget && locked) {
+      focusTarget.x = mesh.position.x;
+      focusTarget.y = mesh.position.y;
+      focusTarget.z = mesh.position.z;
+    }
+
     for (const state of avatarStates) {
       if (state.mesh === mesh) {
         state.targetOpacity = state.textureLoaded ? 1 : 0;
         state.targetScale = (state.baseScale || 1) * hoverConfig.scaleGrowth;
         state.targetGlowIntensity = hoverConfig.glowOpacity;
       } else {
-        state.targetOpacity = state.textureLoaded ? hoverConfig.dimOpacity : 0;
+        state.targetOpacity = locked ? 0 : (state.textureLoaded ? hoverConfig.dimOpacity : 0);
         state.targetScale = state.baseScale || 1;
         state.targetGlowIntensity = 0.0;
       }
@@ -1075,6 +1094,8 @@ export async function populateGallery(scene, camera, renderer, container, artist
     hoveredMesh = null;
     lockedMesh = null;
     domEl.style.cursor = '';
+    // Reset camera focus
+    if (focusTarget) { focusTarget.x = 0; focusTarget.y = 0; focusTarget.z = 0; }
     if (tooltip) {
       tooltip.style.display = 'none';
       tooltip.classList.remove('blink-open');
@@ -1095,6 +1116,9 @@ export async function populateGallery(scene, camera, renderer, container, artist
       const hit = hits[0].object;
       if (lockedMesh === hit) {
         // Clicking the same locked artist — just unlock, keep hover
+        unlockHover();
+      } else if (lockedMesh) {
+        // Another avatar clicked while locked — unlock first
         unlockHover();
       } else {
         // Lock onto this artist

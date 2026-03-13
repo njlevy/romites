@@ -66,22 +66,22 @@ img { max-width: 100%; display: block; }
 .hero-section {
   position: relative;
   width: 100%;
-  height: 100vh;
-  min-height: 600px;
+  height: calc(100vh - var(--nav-h));
+  min-height: 536px;
   overflow: hidden;
 }
 
 @media (max-width: 768px) {
   .hero-section {
-    height: 60vh;
-    min-height: 360px;
+    height: calc(60vh - var(--nav-h));
+    min-height: 296px;
   }
 }
 
 @media (max-width: 480px) {
   .hero-section {
-    height: 50vh;
-    min-height: 300px;
+    height: calc(50vh - var(--nav-h));
+    min-height: 236px;
   }
 }
 

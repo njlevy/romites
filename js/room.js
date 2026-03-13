@@ -30,8 +30,8 @@ export function initRoom(container) {
     const mobileW = 400, tabletW = 768, desktopW = 1200;
 
     // Config at each anchor point
-    const mobile  = { fov: 75, baseZ: 12, rangeX: 0.8, rangeY: 0.4 };
-    const tablet  = { fov: 62, baseZ: 10, rangeX: 1.5, rangeY: 0.6 };
+    const mobile  = { fov: 60, baseZ: 7.5, rangeX: 0.8, rangeY: 0.4 };
+    const tablet  = { fov: 55, baseZ: 8, rangeX: 1.5, rangeY: 0.6 };
     const desktop = { fov: 50, baseZ: 8,  rangeX: 3,   rangeY: 1.2 };
 
     if (w <= mobileW) return mobile;
@@ -156,6 +156,10 @@ export function initRoom(container) {
   /* ---- onBeforeRender callbacks ---- */
   const beforeRenderCallbacks = [];
 
+  /* ---- camera focus target (set by gallery3d when hovering an avatar) ---- */
+  const focusTarget = { x: 0, y: 0, z: 0, baseX: 0, baseZ: 0 };  // baseX/baseZ = group centroid
+  let smoothFocusX = 0, smoothFocusY = 0, smoothFocusZ = config.baseZ;
+
   /* ---- mouse-follow camera ---- */
   let mouseX = 0, mouseY = 0;
   let smoothX = 0, smoothY = 0;
@@ -175,11 +179,24 @@ export function initRoom(container) {
     requestAnimationFrame(animate);
     smoothX += (mouseX - smoothX) * 0.05;
     smoothY += (mouseY - smoothY) * 0.05;
+    // When unlocked, camera centers on group centroid; when locked, on the avatar
+    const targetFX = focusTarget.x || focusTarget.baseX;
+    smoothFocusX += (targetFX - smoothFocusX) * 0.04;
+    smoothFocusY += (focusTarget.y - smoothFocusY) * 0.04;
+    // Target Z: move camera so avatar appears front-row size (6 units away)
+    const FRONT_DIST = 6;
+    const targetZ = focusTarget.z !== 0 ? focusTarget.z + FRONT_DIST : config.baseZ;
+    smoothFocusZ += (targetZ - smoothFocusZ) * 0.04;
 
-    camera.position.x = smoothX * config.rangeX;
-    camera.position.y = 3.5 - smoothY * config.rangeY;
-    camera.position.z = config.baseZ;
-    camera.lookAt(0, 1.5, 0);
+    // Blend camera height down when zoomed so avatars aren't cropped from top
+    const zoomT = 1 - Math.min(1, Math.abs(smoothFocusZ - config.baseZ) / (config.baseZ * 0.4));
+    const camY = 3.5 * zoomT + 2.0 * (1 - zoomT);  // 3.5 → 2.0 when zoomed
+    const lookY = 1.5 * zoomT + 1.5 * (1 - zoomT);  // stays ~1.5
+
+    camera.position.x = smoothX * config.rangeX + smoothFocusX * 0.8;
+    camera.position.y = camY - smoothY * config.rangeY;
+    camera.position.z = smoothFocusZ;
+    camera.lookAt(smoothFocusX * 0.8, lookY, focusTarget.z !== 0 ? focusTarget.z * 0.3 : focusTarget.baseZ * 0.3);
 
     // Run registered callbacks
     for (const cb of beforeRenderCallbacks) cb();
@@ -207,6 +224,7 @@ export function initRoom(container) {
     scene,
     camera,
     renderer,
+    focusTarget,
     onBeforeRender: (cb) => beforeRenderCallbacks.push(cb),
   };
 }
